@@ -1,63 +1,37 @@
 using System.Globalization;
+using System.Threading.Tasks;
 using GoDelivery.Models;
 using Microsoft.EntityFrameworkCore;
 
-public class CustomerRepo
+public class CustomerRepo : Repository<Customer>
 {
-    private readonly AppDbContext _context;
 
- public CustomerRepo(AppDbContext context)
-{
-    _context = context ; 
-}
+ public CustomerRepo(AppDbContext context): base(context)
+    {
+    }
     
  
-// C R U D 
+// C R U D
 
- public async Task<Customer?> GetCustomerByIdAsync(Guid CustomerId, CancellationToken cancellationToken )
-    {
-         return await _context.Customers.FindAsync([CustomerId] , cancellationToken); 
-    }
-
-          
 public async Task<List<Customer>> GetPaginatedCustomersAsync(
-    int pageNumber = 1,
-    int pageSize = 10,
-    CancellationToken cancellationToken = default)
+    int pageNumber,
+    int pageSize,
+    CancellationToken ct)
 {
-    if (pageNumber <= 0)
-        pageNumber = 1;
-
-    if (pageSize <= 0)
-        pageSize = 10;
-
     return await _context.Customers
-    .AsNoTracking()
-    .Include(c => c.AppUser)  
-    .OrderBy(c => c.AppUser!.FullName)
-    .Skip((pageNumber - 1) * pageSize)
-    .Take(pageSize)
-    .ToListAsync(cancellationToken);
+        .AsNoTracking()
+        .Include(a=>a.Addresses)
+        .Skip((pageNumber - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync(ct);
 }
+
 
  
 // For  just view use nooo tracking 
 
-     public async Task<bool> DeleteCutomerById(Guid CustomerId, CancellationToken cancellationToken )
-    {
-         var customerToDelete =  await _context.Customers.FindAsync([CustomerId] , cancellationToken); 
-         if(customerToDelete == null )
-          return false ; 
-
-          _context.Customers.Remove(customerToDelete); 
-          await _context.SaveChangesAsync(cancellationToken); 
-         return true ; 
-    
-    }
-
-
-
-    public async Task<Customer?> GetCustomerByEmailPhone(string email , string phone , CancellationToken cancellationToken = default )
+ 
+    public async Task<Customer?> GetByEmailPhone(string email , string phone , CancellationToken cancellationToken = default )
     {
         var customer = await _context.Customers
         .AsNoTracking()
@@ -69,13 +43,28 @@ public async Task<List<Customer>> GetPaginatedCustomersAsync(
 
         return customer ; 
     }
-
-
- 
-
- 
-
     
+
+public async Task<IEnumerable<Customer>> GetWithAddressesAsync
+(CancellationToken cancellationToken = default )
+        {
+            var Customers =  await _context.Customers                    //. overusing of no Tracking 
+                                            .Include(c => c.Addresses)
+                                            .ToListAsync(cancellationToken);
+            
+            return Customers;
+        }
+
+
+ public async Task<Customer?> GetByAppUserIdAsync
+(Guid AppUserId, CancellationToken cancellationToken = default )
+        {
+            var CustomerWithAddresses = await _context.Customers.Include(x => x.Addresses).AsNoTracking()
+                                                      .FirstOrDefaultAsync(c => c.AppUserId == AppUserId , cancellationToken);
+            
+            return CustomerWithAddresses;
+        }
+
 
 
 }
